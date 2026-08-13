@@ -176,6 +176,7 @@ def test_operations_dashboard_returns_aggregated_metrics(client, db_session) -> 
         driver_id=driver_on_trip.id,
         vehicle_id=None,
         status=TripStatus.TRIP_STARTED,
+        rider_start_pin="123456",
         started_at=now,
     )
     completed_trip = Trip(
@@ -184,6 +185,7 @@ def test_operations_dashboard_returns_aggregated_metrics(client, db_session) -> 
         driver_id=driver_available.id,
         vehicle_id=None,
         status=TripStatus.TRIP_COMPLETED,
+        rider_start_pin="654321",
         started_at=now - timedelta(minutes=20),
         completed_at=now,
         actual_distance=8.1,
