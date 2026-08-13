@@ -91,7 +91,8 @@ def _create_completed_trip(db_session):
             estimated_duration=14,
         ),
     )
-    trip = ride_request.trip
+    ride_request = RideRequestService(db_session).accept_driver_ride_offer(ride_request.id, driver_user)
+    trip = RideRequestService(db_session).trip_service.trip_repository.get_by_ride_request_id(ride_request.id)
     assert trip is not None
     trip = RideRequestService(db_session).trip_service.mark_en_route(trip.id, driver_user)
     trip = RideRequestService(db_session).trip_service.mark_arrived(trip.id, driver_user)
