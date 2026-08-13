@@ -95,7 +95,7 @@ def _create_completed_trip(db_session):
     assert trip is not None
     trip = RideRequestService(db_session).trip_service.mark_en_route(trip.id, driver_user)
     trip = RideRequestService(db_session).trip_service.mark_arrived(trip.id, driver_user)
-    trip = RideRequestService(db_session).trip_service.start_trip(trip.id, driver_user)
+    trip = RideRequestService(db_session).trip_service.start_trip(trip.id, driver_user, trip.rider_start_pin)
     trip = RideRequestService(db_session).trip_service.complete_trip(
         trip.id, driver_user, actual_distance=6.1, actual_duration=17
     )

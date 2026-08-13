@@ -91,9 +91,11 @@ def _create_completed_trip(client):
     ride_id = ride_response.json()["id"]
     accept_response = client.post(f"/api/v1/drivers/me/ride-offers/{ride_id}/accept", headers=driver_headers)
     trip_id = accept_response.json()["trip"]["id"]
+    rider_trip_response = client.get(f"/api/v1/rides/{ride_id}", headers=rider_headers)
+    rider_pin = rider_trip_response.json()["rider_start_pin"]
     client.post(f"/api/v1/trips/{trip_id}/en-route", headers=driver_headers)
     client.post(f"/api/v1/trips/{trip_id}/arrived", headers=driver_headers)
-    client.post(f"/api/v1/trips/{trip_id}/start", headers=driver_headers)
+    client.post(f"/api/v1/trips/{trip_id}/start", json={"rider_start_pin": rider_pin}, headers=driver_headers)
     completed = client.post(
         f"/api/v1/trips/{trip_id}/complete",
         json={"actual_distance": 6.1, "actual_duration": 17},

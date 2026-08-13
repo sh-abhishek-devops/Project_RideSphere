@@ -142,7 +142,7 @@ def test_trip_completion_emits_trip_and_payment_events(db_session) -> None:
     trip_service = TripService(db_session, event_service=event_service)
     trip_service.mark_en_route(trip.id, driver_user)
     trip_service.mark_arrived(trip.id, driver_user)
-    trip_service.start_trip(trip.id, driver_user)
+    trip_service.start_trip(trip.id, driver_user, trip.rider_start_pin)
     trip_service.complete_trip(trip.id, driver_user, actual_distance=6.1, actual_duration=17)
 
     assert [event.event_type for event in repository.events] == [
