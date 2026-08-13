@@ -1,0 +1,13 @@
+.git
+.pytest_cache
+.venv
+__pycache__/
+*.py[cod]
+*.db
+.coverage
+coverage.xml
+htmlcov/
+tests/
+README.md
+.env
+.env.*

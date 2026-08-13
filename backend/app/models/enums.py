@@ -1,0 +1,63 @@
+from enum import StrEnum
+
+
+class UserRole(StrEnum):
+    RIDER = "RIDER"
+    DRIVER = "DRIVER"
+    SUPPORT_AGENT = "SUPPORT_AGENT"
+    PAYMENT_AGENT = "PAYMENT_AGENT"
+    OPERATIONS_MANAGER = "OPERATIONS_MANAGER"
+    ADMIN = "ADMIN"
+
+
+class AvailabilityStatus(StrEnum):
+    OFFLINE = "OFFLINE"
+    AVAILABLE = "AVAILABLE"
+    RESERVED = "RESERVED"
+    ON_TRIP = "ON_TRIP"
+
+
+class RideType(StrEnum):
+    STANDARD = "STANDARD"
+    XL = "XL"
+    PREMIUM = "PREMIUM"
+
+
+class RideRequestStatus(StrEnum):
+    REQUESTED = "REQUESTED"
+    SEARCHING_DRIVER = "SEARCHING_DRIVER"
+    DRIVER_ASSIGNED = "DRIVER_ASSIGNED"
+    CANCELLED = "CANCELLED"
+
+
+class TripStatus(StrEnum):
+    DRIVER_ASSIGNED = "DRIVER_ASSIGNED"
+    DRIVER_EN_ROUTE = "DRIVER_EN_ROUTE"
+    DRIVER_ARRIVED = "DRIVER_ARRIVED"
+    TRIP_STARTED = "TRIP_STARTED"
+    TRIP_COMPLETED = "TRIP_COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class PaymentStatus(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    REFUNDED = "REFUNDED"
+
+
+class SupportCasePriority(StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class SupportCaseStatus(StrEnum):
+    OPEN = "OPEN"
+    ASSIGNED = "ASSIGNED"
+    INVESTIGATING = "INVESTIGATING"
+    WAITING_ON_RIDER = "WAITING_ON_RIDER"
+    WAITING_ON_DRIVER = "WAITING_ON_DRIVER"
+    RESOLVED = "RESOLVED"

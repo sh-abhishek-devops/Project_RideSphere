@@ -1,0 +1,208 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ridesphere-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ridesphere}
+      POSTGRES_USER: ${POSTGRES_USER:-ridesphere}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - ridesphere-data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongodb:
+    image: mongo:7
+    container_name: ridesphere-mongodb
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - ridesphere-data
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: ridesphere-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    networks:
+      - ridesphere-data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: ridesphere-backend
+    environment:
+      APP_NAME: RideSphere
+      APP_ENV: docker
+      API_PREFIX: /api
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: 8000
+      FRONTEND_ORIGINS: http://localhost:3000,http://frontend:8080
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ridesphere}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ridesphere}
+      DATABASE_RETRY_ATTEMPTS: 20
+      DATABASE_RETRY_DELAY_SECONDS: 2
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      PAYMENT_BASE_FARE: ${PAYMENT_BASE_FARE:-4.5}
+      PAYMENT_DISTANCE_RATE_PER_KM: ${PAYMENT_DISTANCE_RATE_PER_KM:-1.75}
+      PAYMENT_DURATION_RATE_PER_MINUTE: ${PAYMENT_DURATION_RATE_PER_MINUTE:-0.35}
+      PAYMENT_CURRENCY: ${PAYMENT_CURRENCY:-USD}
+      MONGODB_ENABLED: "true"
+      MONGODB_URL: mongodb://mongodb:27017
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-ridesphere}
+      MONGODB_EVENTS_COLLECTION: ${MONGODB_EVENTS_COLLECTION:-operational_events}
+      MONGODB_CONNECT_TIMEOUT_MS: ${MONGODB_CONNECT_TIMEOUT_MS:-1000}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_ENABLED: "true"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CELERY_TASK_EAGER_PROPAGATES: "true"
+      CELERY_WORKER_LOG_LEVEL: ${CELERY_WORKER_LOG_LEVEL:-INFO}
+      CELERY_DEFAULT_QUEUE: ${CELERY_DEFAULT_QUEUE:-ridesphere}
+      CELERY_TASK_MAX_RETRIES: ${CELERY_TASK_MAX_RETRIES:-3}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - ridesphere-edge
+      - ridesphere-data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: ./backend
+    container_name: ridesphere-celery-worker
+    command: ["celery", "-A", "app.core.celery_app.celery_app", "worker", "--loglevel=INFO"]
+    environment:
+      APP_NAME: RideSphere
+      APP_ENV: docker
+      API_PREFIX: /api
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ridesphere}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ridesphere}
+      DATABASE_RETRY_ATTEMPTS: 20
+      DATABASE_RETRY_DELAY_SECONDS: 2
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      PAYMENT_BASE_FARE: ${PAYMENT_BASE_FARE:-4.5}
+      PAYMENT_DISTANCE_RATE_PER_KM: ${PAYMENT_DISTANCE_RATE_PER_KM:-1.75}
+      PAYMENT_DURATION_RATE_PER_MINUTE: ${PAYMENT_DURATION_RATE_PER_MINUTE:-0.35}
+      PAYMENT_CURRENCY: ${PAYMENT_CURRENCY:-USD}
+      MONGODB_ENABLED: "true"
+      MONGODB_URL: mongodb://mongodb:27017
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-ridesphere}
+      MONGODB_EVENTS_COLLECTION: ${MONGODB_EVENTS_COLLECTION:-operational_events}
+      MONGODB_CONNECT_TIMEOUT_MS: ${MONGODB_CONNECT_TIMEOUT_MS:-1000}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_ENABLED: "true"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CELERY_TASK_EAGER_PROPAGATES: "true"
+      CELERY_WORKER_LOG_LEVEL: ${CELERY_WORKER_LOG_LEVEL:-INFO}
+      CELERY_DEFAULT_QUEUE: ${CELERY_DEFAULT_QUEUE:-ridesphere}
+      CELERY_TASK_MAX_RETRIES: ${CELERY_TASK_MAX_RETRIES:-3}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.core.celery_app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ridesphere-data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: ridesphere-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - ridesphere-edge
+    ports:
+      - "3000:8080"
+    restart: unless-stopped
+
+networks:
+  ridesphere-edge:
+    name: ridesphere-edge
+    driver: bridge
+  ridesphere-data:
+    name: ridesphere-data
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: ridesphere-postgres-data
+  mongodb_data:
+    name: ridesphere-mongodb-data
+  redis_data:
+    name: ridesphere-redis-data
