@@ -39,6 +39,7 @@ class TripResponse(BaseModel):
     driver_id: UUID
     vehicle_id: UUID | None
     status: TripStatus
+    rider_start_pin: str | None = None
     started_at: datetime | None
     completed_at: datetime | None
     actual_distance: float | None
@@ -52,3 +53,7 @@ class TripResponse(BaseModel):
 class TripCompletionRequest(BaseModel):
     actual_distance: float = Field(gt=0)
     actual_duration: int = Field(gt=0)
+
+
+class TripStartRequest(BaseModel):
+    rider_start_pin: str = Field(pattern=r"^\d{6}$")

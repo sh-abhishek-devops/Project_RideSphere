@@ -220,6 +220,7 @@ class Trip(Base):
         nullable=False,
         index=True,
     )
+    rider_start_pin: Mapped[str] = mapped_column(String(6), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     actual_distance: Mapped[float | None] = mapped_column(Float, nullable=True)

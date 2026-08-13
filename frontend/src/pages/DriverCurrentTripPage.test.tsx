@@ -40,6 +40,7 @@ const assignedTrip = {
   driver_id: "driver-1",
   vehicle_id: "vehicle-1",
   status: "DRIVER_ASSIGNED" as const,
+  rider_start_pin: null,
   started_at: null,
   completed_at: null,
   actual_distance: null,
@@ -89,6 +90,28 @@ describe("DriverCurrentTripPage", () => {
 
     await waitFor(() => {
       expect(markTripEnRoute).toHaveBeenCalledWith("trip-1");
+    });
+  });
+
+  it("requires rider PIN verification before starting a trip", async () => {
+    const arrivedTrip = { ...assignedTrip, status: "DRIVER_ARRIVED" as const };
+    listMyDriverTrips.mockResolvedValue([arrivedTrip]);
+    getTrip.mockResolvedValue(arrivedTrip);
+    startTrip.mockResolvedValue({ ...arrivedTrip, status: "TRIP_STARTED" as const });
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/driver/current-trip/:tripId" element={<DriverCurrentTripPage />} />
+      </Routes>,
+      { route: "/driver/current-trip/trip-1" }
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Start trip" }));
+    fireEvent.change(screen.getByPlaceholderText("6-digit PIN"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and start" }));
+
+    await waitFor(() => {
+      expect(startTrip).toHaveBeenCalledWith("trip-1", { rider_start_pin: "123456" });
     });
   });
 

@@ -85,9 +85,11 @@ def test_trip_lifecycle_and_history(db_session) -> None:
     _, driver_user, driver, _, trip = _create_assigned_trip(db_session)
     service = TripService(db_session)
 
+    assert len(trip.rider_start_pin) == 6
+    assert trip.rider_start_pin.isdigit()
     trip = service.mark_en_route(trip.id, driver_user)
     trip = service.mark_arrived(trip.id, driver_user)
-    trip = service.start_trip(trip.id, driver_user)
+    trip = service.start_trip(trip.id, driver_user, trip.rider_start_pin)
     trip = service.complete_trip(trip.id, driver_user, actual_distance=6.1, actual_duration=17)
 
     assert trip.status == TripStatus.TRIP_COMPLETED
@@ -112,7 +114,18 @@ def test_invalid_transition_is_rejected(db_session) -> None:
     service = TripService(db_session)
 
     with pytest.raises(ResourceConflictError):
-        service.start_trip(trip.id, driver_user)
+        service.start_trip(trip.id, driver_user, trip.rider_start_pin)
+
+
+def test_trip_start_requires_matching_rider_pin(db_session) -> None:
+    _, driver_user, _, _, trip = _create_assigned_trip(db_session)
+    service = TripService(db_session)
+
+    trip = service.mark_en_route(trip.id, driver_user)
+    trip = service.mark_arrived(trip.id, driver_user)
+
+    with pytest.raises(ResourceConflictError, match="Rider PIN does not match."):
+        service.start_trip(trip.id, driver_user, "999999")
 
 
 def test_only_assigned_driver_can_update_trip(db_session) -> None:

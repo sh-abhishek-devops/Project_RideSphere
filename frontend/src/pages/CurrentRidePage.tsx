@@ -170,10 +170,17 @@ export function CurrentRidePage() {
               <span>Vehicle reference</span>
               <strong className="code-chip">{ride.trip?.vehicle_id ?? "Assigned after dispatch"}</strong>
             </div>
+            {ride.rider_start_pin && rideStatus !== "TRIP_STARTED" && rideStatus !== "TRIP_COMPLETED" ? (
+              <div className="ride-summary__row">
+                <span>Trip start PIN</span>
+                <strong className="code-chip">{ride.rider_start_pin}</strong>
+              </div>
+            ) : null}
           </div>
           <p className="inline-muted">
-            Rider-facing driver and vehicle profile details are not exposed by the current backend yet, so the live view shows
-            the assignment references returned by the authenticated rider endpoints.
+            {ride.rider_start_pin
+              ? "Share this PIN with the driver at pickup. The trip will not start until the driver enters the matching code."
+              : "Rider-facing driver and vehicle profile details are not exposed by the current backend yet, so the live view shows the assignment references returned by the authenticated rider endpoints."}
           </p>
         </article>
 

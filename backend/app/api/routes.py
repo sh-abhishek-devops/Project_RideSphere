@@ -9,7 +9,7 @@ from app.api.auth import router as auth_router
 from app.core.config import get_settings
 from app.database.health import get_database_health
 from app.database.session import get_db
-from app.models.domain import User
+from app.models.domain import RideRequest, Trip, User
 from app.models.enums import UserRole
 from app.schemas.driver import DriverCreate, DriverResponse
 from app.schemas.driver_availability import (
@@ -30,7 +30,7 @@ from app.schemas.support_case import (
     SupportCaseUpdate,
     SupportInvestigationResponse,
 )
-from app.schemas.trip import TripCompletionRequest, TripResponse
+from app.schemas.trip import TripCompletionRequest, TripResponse, TripStartRequest
 from app.schemas.user import UserCreate, UserResponse
 from app.schemas.vehicle import VehicleCreate, VehicleResponse
 from app.services.driver import DriverService
@@ -97,6 +97,27 @@ def raise_from_service_error(error: Exception) -> None:
     if isinstance(error, ResourceNotFoundError):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     raise error
+
+
+def serialize_trip_response(trip: Trip, current_user: User) -> TripResponse:
+    trip_response = TripResponse.model_validate(trip)
+    trip_response.rider_start_pin = None
+    rider = current_user.rider_profile
+    if current_user.role == UserRole.RIDER and rider is not None and trip.rider_id == rider.id:
+        trip_response.rider_start_pin = trip.rider_start_pin
+    return trip_response
+
+
+def serialize_ride_request_response(ride_request: RideRequest, current_user: User) -> RideRequestResponse:
+    trip_response = None
+    rider_start_pin = None
+    if ride_request.trip is not None:
+        trip_response = serialize_trip_response(ride_request.trip, current_user)
+        rider_start_pin = trip_response.rider_start_pin
+    ride_response = RideRequestResponse.model_validate(ride_request)
+    ride_response.trip = trip_response
+    ride_response.rider_start_pin = rider_start_pin
+    return ride_response
 
 
 @router.get("/health", response_model=HealthResponse, tags=["health"])
@@ -333,7 +354,7 @@ def list_my_driver_ride_offers(
     current_user: User = Depends(require_roles(UserRole.DRIVER)),
 ) -> list[RideRequestResponse]:
     try:
-        return service.list_driver_ride_offers(current_user)
+        return [serialize_ride_request_response(ride, current_user) for ride in service.list_driver_ride_offers(current_user)]
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -345,7 +366,7 @@ def accept_driver_ride_offer(
     current_user: User = Depends(require_roles(UserRole.DRIVER)),
 ) -> RideRequestResponse:
     try:
-        return service.accept_driver_ride_offer(ride_id, current_user)
+        return serialize_ride_request_response(service.accept_driver_ride_offer(ride_id, current_user), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -362,7 +383,7 @@ def create_ride_request(
     current_user: User = Depends(require_roles(UserRole.RIDER)),
 ) -> RideRequestResponse:
     try:
-        return service.create_ride_request(current_user, payload)
+        return serialize_ride_request_response(service.create_ride_request(current_user, payload), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -382,7 +403,7 @@ def get_ride_request(
     ),
 ) -> RideRequestResponse:
     try:
-        return service.get_ride_request(ride_id, current_user)
+        return serialize_ride_request_response(service.get_ride_request(ride_id, current_user), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -401,7 +422,7 @@ def list_ride_requests(
     ),
 ) -> list[RideRequestResponse]:
     try:
-        return service.list_ride_requests(current_user)
+        return [serialize_ride_request_response(ride, current_user) for ride in service.list_ride_requests(current_user)]
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -421,7 +442,7 @@ def cancel_ride_request(
     ),
 ) -> RideRequestResponse:
     try:
-        return service.cancel_ride_request(ride_id, current_user)
+        return serialize_ride_request_response(service.cancel_ride_request(ride_id, current_user), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -442,7 +463,7 @@ def get_trip(
     ),
 ) -> TripResponse:
     try:
-        return service.get_trip(trip_id, current_user)
+        return serialize_trip_response(service.get_trip(trip_id, current_user), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -453,7 +474,7 @@ def list_my_driver_trips(
     current_user: User = Depends(require_roles(UserRole.DRIVER)),
 ) -> list[TripResponse]:
     try:
-        return service.list_driver_trips(current_user)
+        return [serialize_trip_response(trip, current_user) for trip in service.list_driver_trips(current_user)]
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -465,7 +486,7 @@ def mark_trip_en_route(
     current_user: User = Depends(require_roles(UserRole.DRIVER)),
 ) -> TripResponse:
     try:
-        return service.mark_en_route(trip_id, current_user)
+        return serialize_trip_response(service.mark_en_route(trip_id, current_user), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -477,7 +498,7 @@ def mark_trip_arrived(
     current_user: User = Depends(require_roles(UserRole.DRIVER)),
 ) -> TripResponse:
     try:
-        return service.mark_arrived(trip_id, current_user)
+        return serialize_trip_response(service.mark_arrived(trip_id, current_user), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -485,11 +506,12 @@ def mark_trip_arrived(
 @router.post("/v1/trips/{trip_id}/start", response_model=TripResponse, tags=["trips"])
 def start_trip(
     trip_id: UUID,
+    payload: TripStartRequest,
     service: TripService = Depends(get_trip_service),
     current_user: User = Depends(require_roles(UserRole.DRIVER)),
 ) -> TripResponse:
     try:
-        return service.start_trip(trip_id, current_user)
+        return serialize_trip_response(service.start_trip(trip_id, current_user, payload.rider_start_pin), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 
@@ -502,12 +524,12 @@ def complete_trip(
     current_user: User = Depends(require_roles(UserRole.DRIVER)),
 ) -> TripResponse:
     try:
-        return service.complete_trip(
+        return serialize_trip_response(service.complete_trip(
             trip_id,
             current_user,
             actual_distance=payload.actual_distance,
             actual_duration=payload.actual_duration,
-        )
+        ), current_user)
     except Exception as error:  # pragma: no cover - narrowed by helper
         raise_from_service_error(error)
 

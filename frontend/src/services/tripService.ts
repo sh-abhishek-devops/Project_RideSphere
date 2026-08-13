@@ -1,5 +1,5 @@
 import { apiClient } from "api/client";
-import type { CompleteTripPayload, Trip } from "types/models";
+import type { CompleteTripPayload, StartTripPayload, Trip } from "types/models";
 
 export async function listMyDriverTrips(): Promise<Trip[]> {
   const response = await apiClient.get<Trip[]>("/api/v1/drivers/me/trips");
@@ -21,8 +21,8 @@ export async function markTripArrived(tripId: string): Promise<Trip> {
   return response.data;
 }
 
-export async function startTrip(tripId: string): Promise<Trip> {
-  const response = await apiClient.post<Trip>(`/api/v1/trips/${tripId}/start`);
+export async function startTrip(tripId: string, payload: StartTripPayload): Promise<Trip> {
+  const response = await apiClient.post<Trip>(`/api/v1/trips/${tripId}/start`, payload);
   return response.data;
 }
 

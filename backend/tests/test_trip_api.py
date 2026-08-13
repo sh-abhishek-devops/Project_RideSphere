@@ -78,7 +78,8 @@ def test_trip_endpoint_progression_flow(client) -> None:
     get_response = client.get(f"/api/v1/trips/{trip_id}", headers=rider_headers)
     en_route = client.post(f"/api/v1/trips/{trip_id}/en-route", headers=driver_headers)
     arrived = client.post(f"/api/v1/trips/{trip_id}/arrived", headers=driver_headers)
-    started = client.post(f"/api/v1/trips/{trip_id}/start", headers=driver_headers)
+    rider_pin = ride_response.json()["rider_start_pin"]
+    started = client.post(f"/api/v1/trips/{trip_id}/start", json={"rider_start_pin": rider_pin}, headers=driver_headers)
     completed = client.post(
         f"/api/v1/trips/{trip_id}/complete",
         json={"actual_distance": 6.1, "actual_duration": 17},
@@ -92,6 +93,7 @@ def test_trip_endpoint_progression_flow(client) -> None:
     assert completed.status_code == 200
     assert completed.json()["status"] == "TRIP_COMPLETED"
     assert len(completed.json()["status_history"]) == 5
+    assert get_response.json()["rider_start_pin"] == rider_pin
 
 
 def test_trip_invalid_transition_and_unauthorized_driver(client) -> None:
@@ -104,11 +106,33 @@ def test_trip_invalid_transition_and_unauthorized_driver(client) -> None:
     )
     trip_id = ride_response.json()["trip"]["id"]
 
-    invalid = client.post(f"/api/v1/trips/{trip_id}/start", headers=driver_headers)
+    invalid = client.post(f"/api/v1/trips/{trip_id}/start", json={"rider_start_pin": "123456"}, headers=driver_headers)
     unauthorized = client.post(f"/api/v1/trips/{trip_id}/en-route", headers=other_driver_headers)
 
     assert invalid.status_code == 409
     assert unauthorized.status_code == 409
+
+
+def test_driver_must_submit_matching_rider_pin_to_start_trip(client) -> None:
+    driver_headers, rider_headers, ride_response = _create_assigned_trip(client)
+    trip_id = ride_response.json()["trip"]["id"]
+
+    client.post(f"/api/v1/trips/{trip_id}/en-route", headers=driver_headers)
+    client.post(f"/api/v1/trips/{trip_id}/arrived", headers=driver_headers)
+
+    invalid = client.post(f"/api/v1/trips/{trip_id}/start", json={"rider_start_pin": "111111"}, headers=driver_headers)
+    valid = client.post(
+        f"/api/v1/trips/{trip_id}/start",
+        json={"rider_start_pin": ride_response.json()["rider_start_pin"]},
+        headers=driver_headers,
+    )
+    driver_trip = client.get(f"/api/v1/trips/{trip_id}", headers=driver_headers)
+    rider_trip = client.get(f"/api/v1/trips/{trip_id}", headers=rider_headers)
+
+    assert invalid.status_code == 409
+    assert valid.status_code == 200
+    assert driver_trip.json()["rider_start_pin"] is None
+    assert rider_trip.json()["rider_start_pin"] == ride_response.json()["rider_start_pin"]
 
 
 def test_driver_can_list_own_trips_with_ride_details(client) -> None:

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from secrets import randbelow
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -75,6 +76,7 @@ class TripService:
             driver_id=ride_request.driver_id,
             vehicle_id=vehicle.id if vehicle is not None else None,
             status=TripStatus.DRIVER_ASSIGNED,
+            rider_start_pin=self._generate_rider_start_pin(),
         )
         self.db.add(trip)
         self.db.flush()
@@ -111,8 +113,14 @@ class TripService:
     def mark_arrived(self, trip_id: UUID, current_user: User) -> Trip:
         return self._transition_trip(trip_id, current_user, TripStatus.DRIVER_ARRIVED)
 
-    def start_trip(self, trip_id: UUID, current_user: User) -> Trip:
-        return self._transition_trip(trip_id, current_user, TripStatus.TRIP_STARTED)
+    def start_trip(self, trip_id: UUID, current_user: User, rider_start_pin: str) -> Trip:
+        trip = self.trip_repository.get(trip_id)
+        if trip is None:
+            raise ResourceNotFoundError("Trip not found.")
+        self._assert_driver_controls_trip(current_user, trip)
+        if trip.rider_start_pin != rider_start_pin:
+            raise ResourceConflictError("Rider PIN does not match.")
+        return self._apply_transition(trip, TripStatus.TRIP_STARTED, current_user.id)
 
     def complete_trip(
         self,
@@ -232,6 +240,10 @@ class TripService:
         else:
             availability.status = status
         self.db.add(availability)
+
+    @staticmethod
+    def _generate_rider_start_pin() -> str:
+        return f"{randbelow(1_000_000):06d}"
 
     @staticmethod
     def _assert_driver_controls_trip(current_user: User, trip: Trip) -> None:

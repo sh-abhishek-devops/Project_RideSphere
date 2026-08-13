@@ -7,6 +7,7 @@ import { getErrorMessage } from "api/client";
 import { Button } from "components/Button";
 import { ErrorDisplay } from "components/ErrorDisplay";
 import { LoadingIndicator } from "components/LoadingIndicator";
+import { Modal } from "components/Modal";
 import { StatusBadge } from "components/StatusBadge";
 import { completeTrip, getTrip, listMyDriverTrips, markTripArrived, markTripEnRoute, startTrip } from "services/tripService";
 import type { Trip } from "types/models";
@@ -17,6 +18,8 @@ export function DriverCurrentTripPage() {
   const queryClient = useQueryClient();
   const [distance, setDistance] = useState("6.1");
   const [duration, setDuration] = useState("17");
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [riderPinInput, setRiderPinInput] = useState("");
   const [error, setError] = useState("");
 
   const driverTripsQuery = useQuery({
@@ -55,7 +58,7 @@ export function DriverCurrentTripPage() {
         case "arrived":
           return markTripArrived(selectedTripId);
         case "start":
-          return startTrip(selectedTripId);
+          return startTrip(selectedTripId, { rider_start_pin: riderPinInput });
         case "complete":
           return completeTrip(selectedTripId, {
             actual_distance: Number(distance),
@@ -82,9 +85,32 @@ export function DriverCurrentTripPage() {
       return;
     }
 
+    if (action === "start") {
+      setError("");
+      setRiderPinInput("");
+      setIsPinModalOpen(true);
+      return;
+    }
+
     setError("");
     transitionMutation.mutate(action, {
       onError: (mutationError) => setError(getErrorMessage(mutationError))
+    });
+  }
+
+  function confirmTripStart() {
+    if (!/^\d{6}$/.test(riderPinInput)) {
+      setError("Enter the 6-digit rider PIN before starting the trip.");
+      return;
+    }
+
+    setError("");
+    transitionMutation.mutate("start", {
+      onError: (mutationError) => setError(getErrorMessage(mutationError)),
+      onSuccess: () => {
+        setIsPinModalOpen(false);
+        setRiderPinInput("");
+      }
     });
   }
 
@@ -274,6 +300,36 @@ export function DriverCurrentTripPage() {
       </div>
 
       {error ? <ErrorDisplay message={error} title="Trip action failed" /> : null}
+
+      <Modal
+        footer={
+          <>
+            <Button onClick={() => setIsPinModalOpen(false)} type="button" variant="ghost">
+              Cancel
+            </Button>
+            <Button isLoading={transitionMutation.isPending} onClick={confirmTripStart} type="button" variant="primary">
+              Verify and start
+            </Button>
+          </>
+        }
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        title="Verify rider PIN"
+      >
+        <div className="field">
+          <span className="field__label">Enter the rider's 6-digit start PIN</span>
+          <input
+            className="input"
+            inputMode="numeric"
+            maxLength={6}
+            onChange={(event) => setRiderPinInput(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="6-digit PIN"
+            type="text"
+            value={riderPinInput}
+          />
+          <span className="field__hint">Ask the rider for the PIN shown in their current ride screen.</span>
+        </div>
+      </Modal>
     </section>
   );
 }

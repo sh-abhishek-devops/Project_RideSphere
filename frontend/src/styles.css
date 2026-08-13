@@ -617,11 +617,17 @@ p {
 }
 
 .trip-search,
-.complete-form,
 .panel__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.complete-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
 }
 
 .trip-search {

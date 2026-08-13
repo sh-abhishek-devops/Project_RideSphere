@@ -129,6 +129,7 @@ export interface Trip {
   driver_id: string;
   vehicle_id: string | null;
   status: TripStatus;
+  rider_start_pin: string | null;
   started_at: string | null;
   completed_at: string | null;
   actual_distance: number | null;
@@ -154,6 +155,7 @@ export interface RideRequest {
   status: RideRequestStatus;
   estimated_distance: number;
   estimated_duration: number;
+  rider_start_pin: string | null;
   created_at: string;
   updated_at: string;
   trip: Trip | null;
@@ -255,6 +257,10 @@ export interface CreateRidePayload {
 export interface CompleteTripPayload {
   actual_distance: number;
   actual_duration: number;
+}
+
+export interface StartTripPayload {
+  rider_start_pin: string;
 }
 
 export interface DriverAvailabilityPayload {

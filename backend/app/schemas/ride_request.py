@@ -48,6 +48,7 @@ class RideRequestResponse(BaseModel):
     status: RideRequestStatus
     estimated_distance: float
     estimated_duration: int
+    rider_start_pin: str | None = None
     created_at: datetime
     updated_at: datetime
     trip: TripResponse | None = None
